@@ -12,11 +12,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Caisse">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- Police Arial (système) — aucune police externe à charger -->
 
-<!-- App 100% autonome par téléphone — aucun service externe requis -->
+<!-- Firebase : uniquement pour le catalogue produits et la liste des marchés (partagés).
+     Les ventes et sessions restent 100% locales à chaque téléphone. -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 
 <style>
 :root{
@@ -50,13 +52,13 @@ body{
     radial-gradient(ellipse 900px 500px at 15% -10%, rgba(116,188,196,0.09), transparent 60%),
     radial-gradient(ellipse 700px 500px at 100% 0%, rgba(209,168,94,0.07), transparent 55%);
   color:var(--text-hi);
-  font-family:'Inter',system-ui,sans-serif;
+  font-family:Arial, Helvetica, sans-serif;
   overscroll-behavior:none;
   -webkit-user-select:none;
   user-select:none;
 }
-.font-display{font-family:'Fraunces',serif;}
-.font-mono{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.font-display{font-family:Arial, Helvetica, sans-serif;}
+.font-mono{font-family:Arial, Helvetica, sans-serif; font-variant-numeric:tabular-nums;}
 button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 ::-webkit-scrollbar{width:0;height:0;}
 
@@ -123,7 +125,7 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 .qty-btn.plus:active{ background:rgba(92,168,140,0.34); }
 .qty-btn.minus{ background:rgba(192,122,69,0.14); border-color:rgba(192,122,69,0.34); color:#E8C6A8; }
 .qty-val{
-  flex:1; text-align:center; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px;
+  flex:1; text-align:center; font-family:Arial, Helvetica, sans-serif; font-weight:600; font-size:15px;
   border:1px solid var(--border-soft); border-radius:10px; display:flex; align-items:center; justify-content:center;
   background:var(--bg-void);
 }
@@ -136,15 +138,11 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
   padding:10px 14px calc(12px + var(--safe-bottom));
   display:flex; flex-direction:column; gap:9px;
 }
-.dock-summary{ display:flex; align-items:baseline; justify-content:space-between; }
-.dock-summary .lbl{ font-size:11px; color:var(--text-lo); text-transform:uppercase; letter-spacing:.08em; }
-.dock-summary .count{ font-size:13px; color:var(--text-lo); }
-.dock-summary .brut{ font-family:'IBM Plex Mono',monospace; font-size:15px; color:var(--text-lo); }
-.net-row{ display:flex; align-items:baseline; justify-content:space-between; }
-.net-row .net-lbl{ font-family:'Fraunces',serif; font-size:14px; color:var(--text-hi); font-weight:600; }
-.net-row .net-val{ font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:700; color:var(--accent-emerald-hi); line-height:1; }
+.dock-line{ text-align:right; font-size:13px; color:var(--text-lo); }
+.dock-line .dock-line-label{ color:var(--text-faint); margin-right:4px; }
+.dock-line.net-line{ font-size:20px; font-weight:700; color:var(--accent-emerald-hi); margin-top:2px; }
+.dock-line.net-line .dock-line-label{ font-size:13px; font-weight:600; color:var(--text-hi); margin-right:6px; }
 
-.chip-row{ display:flex; gap:6px; overflow-x:auto; padding-bottom:1px; }
 .chip{
   flex:1 0 auto; padding:8px 4px; border-radius:10px; border:1px solid var(--border-hi);
   background:var(--bg-surface-hi); color:var(--text-lo); font-size:12.5px; font-weight:600; text-align:center;
@@ -153,11 +151,28 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 .chip.active{ background:var(--accent-copper); border-color:var(--accent-copper); color:#1A1204; }
 .chip.free.active{ background:var(--accent-danger); border-color:var(--accent-danger); color:#2A0A0F; }
 
-.pay-row{ display:flex; gap:8px; }
+.remise-row{ display:flex; align-items:stretch; gap:8px; }
+.remise-input-wrap{
+  flex:1; display:flex; align-items:center; gap:4px; padding:0 12px;
+  background:var(--bg-surface-hi); border:1px solid var(--border-hi); border-radius:10px;
+}
+.remise-input-wrap:focus-within{ border-color:var(--accent-copper); }
+.remise-input-wrap input{
+  flex:1; min-width:0; background:transparent; border:none; outline:none;
+  font-family:Arial, Helvetica, sans-serif; font-size:15px; font-weight:600; color:var(--text-hi);
+  padding:9px 0; -moz-appearance:textfield; text-align:left;
+}
+.remise-input-wrap input::-webkit-outer-spin-button,
+.remise-input-wrap input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.remise-input-wrap input::placeholder{ color:var(--text-faint); }
+.remise-input-wrap .remise-pct{ color:var(--text-lo); font-size:13px; font-weight:600; }
+.remise-row .chip{ flex:0 0 auto; padding:9px 18px; min-width:0; }
+
+.pay-row{ display:flex; gap:6px; }
 .pay-btn{
-  flex:1; padding:11px 6px; border-radius:12px; border:1px solid var(--border-hi);
-  background:var(--bg-surface-hi); color:var(--text-lo); font-size:14px; font-weight:700;
-  display:flex; align-items:center; justify-content:center; gap:6px; touch-action:manipulation;
+  flex:1; padding:11px 4px; border-radius:12px; border:1px solid var(--border-hi);
+  background:var(--bg-surface-hi); color:var(--text-lo); font-size:12.5px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; gap:4px; touch-action:manipulation;
 }
 .pay-btn.active{ background:rgba(209,168,94,0.22); border-color:var(--accent-blue); color:#F0DDB0; }
 
@@ -214,7 +229,7 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 }
 .sheet-backdrop.center.open .sheet{ transform:scale(1); }
 .sheet-handle{ width:40px; height:4px; background:var(--border-hi); border-radius:99px; margin:2px auto 12px; }
-.sheet h2{ font-family:'Fraunces',serif; font-size:19px; margin:0 0 4px; }
+.sheet h2{ font-family:Arial, Helvetica, sans-serif; font-size:19px; font-weight:700; margin:0 0 4px; }
 .sheet-sub{ color:var(--text-lo); font-size:12.5px; margin:0 0 14px; }
 
 .field{ margin-bottom:12px; }
@@ -255,9 +270,26 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 
 .plist-row{ display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--border-soft); }
 .plist-row img, .plist-row .ph{ width:44px; height:44px; border-radius:9px; object-fit:cover; background:var(--bg-surface-hi); flex:0 0 auto; }
+
+.config-warning{
+  position:fixed; inset:0; z-index:200; background:var(--bg-void); display:none;
+  flex-direction:column; align-items:center; justify-content:center; padding:28px; text-align:center; gap:12px;
+}
+.config-warning .cw-ic{ font-size:38px; }
+.config-warning h1{ font-family:Arial, Helvetica, sans-serif; font-size:20px; margin:0; }
+.config-warning p{ color:var(--text-lo); font-size:13.5px; max-width:340px; line-height:1.5; margin:0; }
+.config-warning code{ background:var(--bg-surface-hi); padding:2px 6px; border-radius:6px; font-size:12px; }
 </style>
 </head>
 <body>
+
+<div class="config-warning" id="configWarning">
+  <div class="cw-ic">🔧</div>
+  <h1>Configuration Firebase manquante</h1>
+  <p>Ouvre <code>index.html</code>, remplace les 6 lignes <code>firebaseConfig</code> par
+  celles de ton propre projet Firebase, puis republie le fichier. Voir
+  <code>GUIDE_DEPLOIEMENT.md</code>, étape 1.</p>
+</div>
 
 <div id="app" class="app-shell">
 
@@ -288,25 +320,24 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 
   <!-- DOCK / BANDEAU DE COMMANDE -->
   <section class="dock" id="dock">
-    <div class="dock-summary">
-      <div class="lbl">Panier</div>
-      <div class="count" id="artCount">0 article</div>
-    </div>
-    <div class="dock-summary" style="margin-top:-6px;">
-      <span class="font-mono" style="font-size:12px; color:var(--text-faint);">Total brut</span>
-      <span class="brut" id="brutVal">0,00 €</span>
+    <div class="dock-line"><span class="dock-line-label">Panier :</span> <span id="artCount">0 article</span></div>
+    <div class="dock-line" style="margin-top:-4px;"><span class="dock-line-label">Total brut :</span> <span id="brutVal">0,00 €</span></div>
+
+    <div class="remise-row">
+      <div class="remise-input-wrap">
+        <input id="remiseInput" type="number" inputmode="decimal" min="0" max="100" step="1" value="" placeholder="0" oninput="onRemiseInput(this.value)">
+        <span class="remise-pct">%</span>
+      </div>
+      <button class="chip" id="chip10" onclick="toggleChipRemise(10)">10%</button>
+      <button class="chip free" id="chipGratuit" onclick="toggleChipRemise(100)">GRATUIT</button>
     </div>
 
-    <div class="chip-row" id="remiseRow"></div>
-
-    <div class="net-row">
-      <span class="net-lbl">Total net</span>
-      <span class="net-val font-mono" id="netVal">0,00 €</span>
-    </div>
+    <div class="dock-line net-line"><span class="dock-line-label">Total net :</span> <span id="netVal">0,00 €</span></div>
 
     <div class="pay-row" id="payRow">
       <button class="pay-btn active" data-pay="Especes" onclick="setPay('Especes')">💶 Espèces</button>
       <button class="pay-btn" data-pay="CB" onclick="setPay('CB')">💳 CB</button>
+      <button class="pay-btn" data-pay="Cheque" onclick="setPay('Cheque')">🖊️ Chèque</button>
     </div>
 
     <button class="confirm-btn" id="confirmBtn" onclick="confirmSale()">
@@ -422,7 +453,7 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
    Une session clôturée est immédiatement purgée après son récap/export.
    ============================================================ */
 
-const LS_KEYS = { products:'pos_products', sessions:'pos_sessions', ventes:'pos_ventes' };
+const LS_KEYS = { sessions:'pos_sessions', ventes:'pos_ventes' };
 
 const uid = (p) => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const eur = (n) => (Math.round((n+Number.EPSILON)*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
@@ -432,7 +463,22 @@ function round2(n){ return Math.round((n+Number.EPSILON)*100)/100; }
 function escAttr(s){ return (s||'').replace(/"/g,'&quot;'); }
 function escHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-/* ---------- persistence (100% locale à ce téléphone) ---------- */
+/* ---------- 1) CONFIGURATION FIREBASE ----------
+   Uniquement pour le catalogue produits et la liste des marchés (partagés
+   entre tous les appareils). Remplace ces 6 valeurs par celles de TON projet
+   Firebase (Console → ⚙️ Paramètres du projet → Vos applications → Config).
+   Voir GUIDE_DEPLOIEMENT.md, étape 1. */
+const firebaseConfig = {
+  apiKey: "AIzaSyArfF_CTzTnb-yFyJpT3KRsw0eqZiW2IW0",
+  authDomain: "ail-noir-des-claires-caisse.firebaseapp.com",
+  projectId: "ail-noir-des-claires-caisse",
+  storageBucket: "ail-noir-des-claires-caisse.firebasestorage.app",
+  messagingSenderId: "722689231248",
+  appId: "1:722689231248:web:f0e651f70f724707c4cb15"
+};
+const FIREBASE_CONFIGURED = !Object.values(firebaseConfig).some(v => String(v).includes('COLLEZ_ICI'));
+
+/* ---------- persistence : ventes/sessions 100% locales à ce téléphone ---------- */
 function load(key, fallback){
   try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
   catch(e){ return fallback; }
@@ -440,30 +486,38 @@ function load(key, fallback){
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.warn('LS save failed', e); } }
 
 const SEED_PRODUCTS = [
-  { id: uid('prod'), nom:"Tête d'ail noir", prix_unitaire:6.90, photo_url:'', quantite_panier:0 },
-  { id: uid('prod'), nom:"Gousses d'ail noir (sachet)", prix_unitaire:4.50, photo_url:'', quantite_panier:0 },
-  { id: uid('prod'), nom:"Miel à l'ail noir", prix_unitaire:8.50, photo_url:'', quantite_panier:0 },
-  { id: uid('prod'), nom:"Huile de tournesol à l'ail noir", prix_unitaire:9.90, photo_url:'', quantite_panier:0 },
-  { id: uid('prod'), nom:"Fleur de sel à l'ail noir", prix_unitaire:5.90, photo_url:'', quantite_panier:0 },
-  { id: uid('prod'), nom:'Bourriche à composer', prix_unitaire:15.00, photo_url:'', quantite_panier:0 },
+  { nom:"Tête d'ail noir", prix_unitaire:6.90, photo_url:'' },
+  { nom:"Gousses d'ail noir (sachet)", prix_unitaire:4.50, photo_url:'' },
+  { nom:"Miel à l'ail noir", prix_unitaire:8.50, photo_url:'' },
+  { nom:"Huile de tournesol à l'ail noir", prix_unitaire:9.90, photo_url:'' },
+  { nom:"Fleur de sel à l'ail noir", prix_unitaire:5.90, photo_url:'' },
+  { nom:'Bourriche à composer', prix_unitaire:15.00 },
 ];
 
+let catalogueDocs = [];   // catalogue partagé (Firestore), reçu en direct
 let state = {
-  products: load(LS_KEYS.products, null) || SEED_PRODUCTS,
-  sessions: load(LS_KEYS.sessions, []),   // ne contient jamais plus d'une session (l'active)
-  ventes: load(LS_KEYS.ventes, []),       // uniquement les ventes de la session active
+  products: [],            // catalogueDocs + quantite_panier local (fusion à chaque snapshot)
+  marches: [],              // liste des marchés partagée (Firestore)
+  sessions: load(LS_KEYS.sessions, []),   // ne contient jamais plus d'une session (l'active) — local
+  ventes: load(LS_KEYS.ventes, []),       // uniquement les ventes de la session active — local
   remise: 0,
   paiement: 'Especes',
 };
-if(!load(LS_KEYS.products, null)) save(LS_KEYS.products, state.products);
 
 function persistAll(){
-  save(LS_KEYS.products, state.products);
   save(LS_KEYS.sessions, state.sessions);
   save(LS_KEYS.ventes, state.ventes);
 }
 
 function activeSession(){ return state.sessions.find(s => s.statut === 'Active') || null; }
+
+function rebuildProducts(){
+  const qtyById = Object.fromEntries(state.products.map(p => [p.id, p.quantite_panier||0]));
+  state.products = catalogueDocs.map(d => ({
+    id: d.id, nom: d.nom, prix_unitaire: d.prix_unitaire, photo_url: d.photo_url || '',
+    quantite_panier: qtyById[d.id] || 0
+  }));
+}
 
 /* Dernier récap clôturé, gardé UNIQUEMENT en mémoire vive (jamais sauvegardé) —
    permet de le réexporter si besoin tant que l'app n'a pas été rechargée. */
@@ -511,14 +565,12 @@ function incQty(id){
   p.quantite_panier++;
   updateCardQty(p);
   updateDock();
-  save(LS_KEYS.products, state.products);
 }
 function decQty(id){
   const p = findProd(id); if(!p) return;
   if(p.quantite_panier>0) p.quantite_panier--;
   updateCardQty(p);
   updateDock();
-  save(LS_KEYS.products, state.products);
 }
 function updateCardQty(p){
   const card = document.getElementById('card_'+p.id);
@@ -528,15 +580,24 @@ function updateCardQty(p){
 }
 
 /* ---------- dock / cart logic ---------- */
-const REMISES = [0,5,10,15,20,100];
-const remiseRow = document.getElementById('remiseRow');
-remiseRow.innerHTML = REMISES.map(r => `
-  <button class="chip ${r===0?'active':''} ${r===100?'free':''}" data-r="${r}" onclick="setRemise(${r})">${r===100?'GRATUIT':r+'%'}</button>
-`).join('');
-
-function setRemise(r){
-  state.remise = r;
-  [...remiseRow.children].forEach(c => c.classList.toggle('active', Number(c.dataset.r)===r));
+/* Remise libre : saisie directe (0-100), ou raccourcis 10% / GRATUIT qui se
+   sélectionnent au clic et se désélectionnent (retour à 0%) à un nouveau clic. */
+function clampPct(n){ return Math.max(0, Math.min(100, isNaN(n) ? 0 : n)); }
+function syncRemiseUI(){
+  const input = document.getElementById('remiseInput');
+  input.value = state.remise === 0 ? '' : state.remise;
+  document.getElementById('chip10').classList.toggle('active', state.remise === 10);
+  document.getElementById('chipGratuit').classList.toggle('active', state.remise === 100);
+}
+function onRemiseInput(val){
+  state.remise = clampPct(parseFloat(val));
+  document.getElementById('chip10').classList.toggle('active', state.remise === 10);
+  document.getElementById('chipGratuit').classList.toggle('active', state.remise === 100);
+  updateDock();
+}
+function toggleChipRemise(val){
+  state.remise = (state.remise === val) ? 0 : val;
+  syncRemiseUI();
   updateDock();
 }
 function setPay(mode){
@@ -582,12 +643,13 @@ function confirmSale(){
 
   sess.total_ca = round2(sess.total_ca + net);
   if(state.paiement === 'Especes') sess.total_especes = round2(sess.total_especes + net);
-  else sess.total_cb = round2(sess.total_cb + net);
+  else if(state.paiement === 'CB') sess.total_cb = round2(sess.total_cb + net);
+  else sess.total_cheque = round2((sess.total_cheque||0) + net);
 
   state.products.forEach(p => p.quantite_panier = 0);
   renderGrid();
   state.remise = 0;
-  [...remiseRow.children].forEach(c => c.classList.toggle('active', Number(c.dataset.r)===0));
+  syncRemiseUI();
   state.paiement = 'Especes';
   document.querySelectorAll('.pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay==='Especes'));
   updateDock();
@@ -646,7 +708,7 @@ function updateSessionInfo(){
     infoEl.innerHTML = `<span class="pill off">○ Aucune session</span>`;
     menuSub.textContent = 'Aucune session active — appuyez pour démarrer';
   }
-  menuProd.textContent = `${state.products.length} produit(s) au catalogue`;
+  menuProd.textContent = `${state.products.length} produit(s) — catalogue partagé`;
 }
 
 /* ---------- session sheet ---------- */
@@ -662,25 +724,45 @@ function renderSessionSheet(){
         <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Ventes enregistrées</span><span class="font-mono">${nbVentes}</span></div>
         <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Total espèces</span><span class="font-mono">${eur(sess.total_especes)}</span></div>
         <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Total CB</span><span class="font-mono">${eur(sess.total_cb)}</span></div>
+        <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Total chèque</span><span class="font-mono">${eur(sess.total_cheque||0)}</span></div>
         <div class="hist-row" style="border-bottom:none;"><span style="font-weight:700;">Chiffre d'affaires</span><span class="font-mono" style="color:var(--accent-emerald-hi); font-weight:700; font-size:16px;">${eur(sess.total_ca)}</span></div>
       </div>
       <button class="btn btn-danger" onclick="closeSession()">Clôturer la session</button>
     `;
   } else {
+    const options = state.marches.map(m => `<option value="${escAttr(m)}">${escHtml(m)}</option>`).join('');
     el.innerHTML = `
       <h2>Nouvelle session</h2>
       <p class="sheet-sub">Démarrez une session pour commencer à vendre</p>
-      <div class="field"><label>Lieu du marché</label><input id="ns_lieu" type="text" placeholder="Ex : La Palmyre"></div>
+      <div class="field">
+        <label>Lieu du marché</label>
+        <select id="ns_lieu_select" onchange="onLieuSelectChange()">
+          ${options}
+          <option value="__new__">+ Ajouter un nouveau marché…</option>
+        </select>
+        <input id="ns_lieu_new" type="text" placeholder="Nom du nouveau marché" style="margin-top:8px; display:${state.marches.length?'none':'block'};">
+      </div>
       <div class="field"><label>Date</label><input id="ns_date" type="date" value="${todayISO()}"></div>
       <button class="btn btn-primary" onclick="startSession()">Démarrer la session</button>
     `;
+    if(!state.marches.length) document.getElementById('ns_lieu_select').style.display = 'none';
   }
 }
-function startSession(){
-  const lieu = document.getElementById('ns_lieu').value.trim() || 'Marché';
+function onLieuSelectChange(){
+  const sel = document.getElementById('ns_lieu_select');
+  document.getElementById('ns_lieu_new').style.display = (sel.value === '__new__') ? 'block' : 'none';
+}
+async function startSession(){
+  const sel = document.getElementById('ns_lieu_select');
+  let lieu = (sel && sel.style.display !== 'none') ? sel.value : '__new__';
+  if(lieu === '__new__'){
+    lieu = document.getElementById('ns_lieu_new').value.trim();
+    if(!lieu){ toast('Indiquez un nom de marché', true); return; }
+    addMarche(lieu);
+  }
   const date = document.getElementById('ns_date').value || todayISO();
   if(activeSession()){ toast('Une session est déjà active', true); return; }
-  state.sessions.push({ id_session: uid('sess'), date_session:date, lieu_marche:lieu, total_ca:0, total_especes:0, total_cb:0, statut:'Active' });
+  state.sessions.push({ id_session: uid('sess'), date_session:date, lieu_marche:lieu, total_ca:0, total_especes:0, total_cb:0, total_cheque:0, statut:'Active' });
   persistAll();
   updateSessionInfo();
   renderSessionSheet();
@@ -711,6 +793,7 @@ function showRecap(sess, nbVentes){
     <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Ventes</span><span class="font-mono">${nbVentes}</span></div>
     <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Espèces</span><span class="font-mono">${eur(sess.total_especes)}</span></div>
     <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">CB</span><span class="font-mono">${eur(sess.total_cb)}</span></div>
+    <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Chèque</span><span class="font-mono">${eur(sess.total_cheque||0)}</span></div>
     <div class="hist-row" style="border-bottom:none;"><span style="font-weight:700;">Chiffre d'affaires</span><span class="font-mono" style="color:var(--accent-emerald-hi); font-weight:700; font-size:16px;">${eur(sess.total_ca)}</span></div>
   `;
   openSheet('sheetRecap');
@@ -759,30 +842,33 @@ function openProductForm(id){
   }
   openSheet('sheetProdForm');
 }
-function saveProductForm(){
+async function saveProductForm(){
   const nom = document.getElementById('pf_nom').value.trim();
   const prix = parseFloat(document.getElementById('pf_prix').value);
   const photo = document.getElementById('pf_photo').value.trim();
   if(!nom || isNaN(prix) || prix<0){ toast('Nom et prix valides requis', true); return; }
-  if(editingProdId){
-    const p = findProd(editingProdId);
-    p.nom = nom; p.prix_unitaire = prix; p.photo_url = photo;
-  } else {
-    state.products.push({ id: uid('prod'), nom, prix_unitaire:prix, photo_url:photo, quantite_panier:0 });
+  try{
+    if(editingProdId){
+      await db.collection('catalogue').doc(editingProdId).update({ nom, prix_unitaire:prix, photo_url:photo });
+    } else {
+      await db.collection('catalogue').add({ nom, prix_unitaire:prix, photo_url:photo });
+    }
+    closeSheet('sheetProdForm');
+    toast('Produit enregistré (partagé sur tous les appareils)');
+  }catch(e){
+    toast('Erreur réseau — réessayez', true);
   }
-  persistAll();
-  renderGrid(); updateDock(); renderProductList(); updateSessionInfo();
-  closeSheet('sheetProdForm');
-  toast('Produit enregistré');
 }
 async function deleteProductForm(){
   if(!editingProdId) return;
-  if(!(await askConfirm('Cette action est définitive.', 'Supprimer ce produit du catalogue ?'))) return;
-  state.products = state.products.filter(p => p.id !== editingProdId);
-  persistAll();
-  renderGrid(); updateDock(); renderProductList(); updateSessionInfo();
-  closeSheet('sheetProdForm');
-  toast('Produit supprimé');
+  if(!(await askConfirm('Cette action est définitive, sur tous les appareils.', 'Supprimer ce produit du catalogue ?'))) return;
+  try{
+    await db.collection('catalogue').doc(editingProdId).delete();
+    closeSheet('sheetProdForm');
+    toast('Produit supprimé');
+  }catch(e){
+    toast('Erreur réseau — réessayez', true);
+  }
 }
 
 /* ---------- export CSV (récap pour ta compta) ---------- */
@@ -821,17 +907,72 @@ function exportCurrentSession(){
   const sess = activeSession();
   if(!sess){ toast('Aucune session active', true); return; }
   const ventes = state.ventes.filter(v => v.id_session === sess.id_session);
-  writeCSV(ventes, (sess.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + sess.date_session);
+  writeCSV(sess, ventes, (sess.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + sess.date_session);
 }
 function exportRecapCSVFromMenu(){
   if(!lastClosedRecap) return;
-  writeCSV(lastClosedRecap.ventes, (lastClosedRecap.session.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + lastClosedRecap.session.date_session);
+  writeCSV(lastClosedRecap.session, lastClosedRecap.ventes, (lastClosedRecap.session.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + lastClosedRecap.session.date_session);
 }
-function writeCSV(ventes, label){
+
+/* Export CSV structuré en 3 sections, pensé pour être lisible/exploitable dans un
+   tableur : (1) résumé chiffré de la session, (2) quantités vendues par produit,
+   (3) détail ligne par ligne de chaque vente. */
+function writeCSV(sess, ventes, label){
   if(!ventes || ventes.length===0){ toast('Aucune vente à exporter', true); return; }
-  const headers = ['id_vente','horodatage','detail_articles','total_brut','remise_pourcent','total_net','mode_paiement'];
-  const rows = ventes.map(v => headers.map(h => csvEscape(v[h])).join(';'));
-  const csv = headers.join(';') + '\n' + rows.join('\n');
+
+  const nbVentes = ventes.length;
+  const totalArticles = ventes.reduce((sum, v) => {
+    try{ return sum + JSON.parse(v.detail_articles).reduce((s,a)=>s+(a.quantite||0),0); }
+    catch(e){ return sum; }
+  }, 0);
+  const totalBrut = round2(ventes.reduce((s,v)=>s+(v.total_brut||0),0));
+  const totalNet = round2(ventes.reduce((s,v)=>s+(v.total_net||0),0));
+  const totalRemises = round2(totalBrut - totalNet);
+
+  const lignes = [];
+  lignes.push(['RÉSUMÉ DE SESSION']);
+  lignes.push(['Lieu du marché', sess.lieu_marche || '']);
+  lignes.push(['Date', sess.date_session || '']);
+  lignes.push(['Nombre de ventes', nbVentes]);
+  lignes.push(["Nombre d'articles vendus", totalArticles]);
+  lignes.push(['Total brut (€)', totalBrut.toFixed(2)]);
+  lignes.push(['Total remises accordées (€)', totalRemises.toFixed(2)]);
+  lignes.push(['Total net (€)', totalNet.toFixed(2)]);
+  lignes.push(['Dont espèces (€)', (sess.total_especes||0).toFixed(2)]);
+  lignes.push(['Dont CB (€)', (sess.total_cb||0).toFixed(2)]);
+  lignes.push(['Dont chèque (€)', (sess.total_cheque||0).toFixed(2)]);
+  lignes.push([]);
+
+  const parProduit = {};
+  ventes.forEach(v => {
+    let articles = [];
+    try{ articles = JSON.parse(v.detail_articles); }catch(e){}
+    articles.forEach(a => {
+      if(!parProduit[a.nom]) parProduit[a.nom] = { qte:0, total:0 };
+      parProduit[a.nom].qte += (a.quantite||0);
+      parProduit[a.nom].total += (a.quantite||0) * (a.prix_unitaire||0);
+    });
+  });
+  lignes.push(['DÉTAIL PAR PRODUIT']);
+  lignes.push(['Produit', 'Quantité vendue', 'Total brut (€)']);
+  Object.keys(parProduit).sort().forEach(nom => {
+    lignes.push([nom, parProduit[nom].qte, parProduit[nom].total.toFixed(2)]);
+  });
+  lignes.push([]);
+
+  lignes.push(['DÉTAIL DES VENTES']);
+  lignes.push(['Heure', 'Articles', 'Total brut (€)', 'Remise (%)', 'Total net (€)', 'Mode de paiement']);
+  ventes.forEach(v => {
+    let articlesTxt = '';
+    try{
+      articlesTxt = JSON.parse(v.detail_articles).map(a => `${a.quantite}x ${a.nom}`).join(', ');
+    }catch(e){}
+    let heure = v.horodatage;
+    try{ heure = new Date(v.horodatage).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }catch(e){}
+    lignes.push([heure, articlesTxt, (v.total_brut||0).toFixed(2), v.remise_pourcent||0, (v.total_net||0).toFixed(2), modePaiementLabel(v.mode_paiement)]);
+  });
+
+  const csv = lignes.map(row => row.map(csvEscape).join(';')).join('\n');
   const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -839,15 +980,63 @@ function writeCSV(ventes, label){
   document.body.appendChild(a); a.click(); a.remove();
   toast('CSV exporté');
 }
+function modePaiementLabel(m){
+  return m === 'Especes' ? 'Espèces' : m === 'CB' ? 'CB' : m === 'Cheque' ? 'Chèque' : (m||'');
+}
 function csvEscape(v){
   const s = String(v??'');
   return '"' + s.replace(/"/g,'""') + '"';
 }
 
+/* ---------- ajout d'un marché à la volée (partagé) ---------- */
+async function addMarche(nom){
+  if(state.marches.includes(nom)) return;
+  try{ await db.collection('marches').add({ nom }); }
+  catch(e){ /* pas grave : la session démarre quand même avec ce nom */ }
+}
+
 /* ---------- init ---------- */
-renderGrid();
+let db;
+function initApp(){
+  if(!FIREBASE_CONFIGURED){
+    document.getElementById('configWarning').style.display = 'flex';
+    return;
+  }
+
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  try{ db.enablePersistence({ synchronizeTabs:true }).catch(()=>{}); }catch(e){}
+  firebase.auth().signInAnonymously().catch(() => {
+    toast('Connexion initiale impossible — vérifiez le réseau', true);
+  });
+
+  prodGrid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="em-ic">☁️</div>Connexion au catalogue partagé…</div>`;
+
+  let catalogueSeeded = false;
+  db.collection('catalogue').onSnapshot(snap => {
+    catalogueDocs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    if(catalogueDocs.length === 0 && !catalogueSeeded && !snap.metadata.fromCache){
+      catalogueSeeded = true;
+      const batch = db.batch();
+      SEED_PRODUCTS.forEach(p => batch.set(db.collection('catalogue').doc(), p));
+      batch.commit().catch(()=>{});
+    }
+    rebuildProducts();
+    renderGrid();
+    updateDock();
+    if(document.getElementById('sheetProducts-bd').classList.contains('open')) renderProductList();
+    updateSessionInfo();
+  }, () => toast('Erreur de connexion au catalogue', true));
+
+  db.collection('marches').orderBy('nom').onSnapshot(snap => {
+    state.marches = snap.docs.map(d => d.data().nom).filter(Boolean);
+    if(document.getElementById('sheetSession-bd').classList.contains('open')) renderSessionSheet();
+  }, () => toast('Erreur de connexion à la liste des marchés', true));
+}
+
 updateDock();
 updateSessionInfo();
+initApp();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
