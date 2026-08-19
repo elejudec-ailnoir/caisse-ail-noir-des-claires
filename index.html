@@ -1019,8 +1019,10 @@ function initApp(){
       attachFirestoreListeners();
     }
   });
-  firebase.auth().signInAnonymously().catch(() => {
-    toast('Connexion initiale impossible — vérifiez le réseau', true);
+  firebase.auth().signInAnonymously().catch((err) => {
+    console.error('Erreur de connexion Firebase :', err);
+    const code = err && err.code ? err.code : 'inconnue';
+    toast('Connexion impossible (' + code + ')', true);
   });
 }
 
@@ -1039,12 +1041,12 @@ function attachFirestoreListeners(){
     updateDock();
     if(document.getElementById('sheetProducts-bd').classList.contains('open')) renderProductList();
     updateSessionInfo();
-  }, () => toast('Erreur de connexion au catalogue', true));
+  }, (err) => { console.error('Erreur catalogue :', err); toast('Erreur catalogue (' + (err.code||'?') + ')', true); });
 
   db.collection('marches').orderBy('nom').onSnapshot(snap => {
     state.marches = snap.docs.map(d => d.data().nom).filter(Boolean);
     if(document.getElementById('sheetSession-bd').classList.contains('open')) renderSessionSheet();
-  }, () => toast('Erreur de connexion à la liste des marchés', true));
+  }, (err) => { console.error('Erreur marchés :', err); toast('Erreur marchés (' + (err.code||'?') + ')', true); });
 }
 
 updateDock();
