@@ -800,7 +800,7 @@ function showRecap(sess, nbVentes){
 }
 function exportRecapCSV(){
   if(lastClosedRecap){
-    writeCSV(lastClosedRecap.ventes, (lastClosedRecap.session.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + lastClosedRecap.session.date_session);
+    writeCSV(lastClosedRecap.session, lastClosedRecap.ventes, (lastClosedRecap.session.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + lastClosedRecap.session.date_session);
   }
   closeSheet('sheetRecap');
 }
@@ -917,6 +917,9 @@ function exportRecapCSVFromMenu(){
 /* Export CSV structuré en 3 sections, pensé pour être lisible/exploitable dans un
    tableur : (1) résumé chiffré de la session, (2) quantités vendues par produit,
    (3) détail ligne par ligne de chaque vente. */
+function fmtMoney(n){ return (n||0).toFixed(2).replace('.', ',') + ' €'; }
+function fmtPct(n){ return (n||0) + ' %'; }
+
 function writeCSV(sess, ventes, label){
   if(!ventes || ventes.length===0){ toast('Aucune vente à exporter', true); return; }
 
@@ -928,19 +931,27 @@ function writeCSV(sess, ventes, label){
   const totalBrut = round2(ventes.reduce((s,v)=>s+(v.total_brut||0),0));
   const totalNet = round2(ventes.reduce((s,v)=>s+(v.total_net||0),0));
   const totalRemises = round2(totalBrut - totalNet);
+  const separateur = ['――――――――――――――――――――――――――――――――――――――――'];
 
   const lignes = [];
-  lignes.push(['RÉSUMÉ DE SESSION']);
+  lignes.push(['CAISSE — AIL NOIR DES CLAIRES']);
+  lignes.push(['Récapitulatif de session']);
+  lignes.push([]);
   lignes.push(['Lieu du marché', sess.lieu_marche || '']);
-  lignes.push(['Date', sess.date_session || '']);
+  lignes.push(['Date', fmtDate(sess.date_session)]);
+  lignes.push([]);
+
+  lignes.push(separateur);
+  lignes.push(['RÉSUMÉ']);
+  lignes.push(separateur);
   lignes.push(['Nombre de ventes', nbVentes]);
   lignes.push(["Nombre d'articles vendus", totalArticles]);
-  lignes.push(['Total brut (€)', totalBrut.toFixed(2)]);
-  lignes.push(['Total remises accordées (€)', totalRemises.toFixed(2)]);
-  lignes.push(['Total net (€)', totalNet.toFixed(2)]);
-  lignes.push(['Dont espèces (€)', (sess.total_especes||0).toFixed(2)]);
-  lignes.push(['Dont CB (€)', (sess.total_cb||0).toFixed(2)]);
-  lignes.push(['Dont chèque (€)', (sess.total_cheque||0).toFixed(2)]);
+  lignes.push(['Total brut', fmtMoney(totalBrut)]);
+  lignes.push(['Total remises accordées', fmtMoney(totalRemises)]);
+  lignes.push(['Total net', fmtMoney(totalNet)]);
+  lignes.push(['Dont espèces', fmtMoney(sess.total_especes||0)]);
+  lignes.push(['Dont CB', fmtMoney(sess.total_cb||0)]);
+  lignes.push(['Dont chèque', fmtMoney(sess.total_cheque||0)]);
   lignes.push([]);
 
   const parProduit = {};
@@ -953,15 +964,23 @@ function writeCSV(sess, ventes, label){
       parProduit[a.nom].total += (a.quantite||0) * (a.prix_unitaire||0);
     });
   });
+  lignes.push(separateur);
   lignes.push(['DÉTAIL PAR PRODUIT']);
-  lignes.push(['Produit', 'Quantité vendue', 'Total brut (€)']);
+  lignes.push(separateur);
+  lignes.push(['Produit', 'Quantité vendue', 'Total brut']);
+  let totalProduitsQte = 0, totalProduitsMontant = 0;
   Object.keys(parProduit).sort().forEach(nom => {
-    lignes.push([nom, parProduit[nom].qte, parProduit[nom].total.toFixed(2)]);
+    lignes.push([nom, parProduit[nom].qte, fmtMoney(parProduit[nom].total)]);
+    totalProduitsQte += parProduit[nom].qte;
+    totalProduitsMontant += parProduit[nom].total;
   });
+  lignes.push(['TOTAL', totalProduitsQte, fmtMoney(totalProduitsMontant)]);
   lignes.push([]);
 
+  lignes.push(separateur);
   lignes.push(['DÉTAIL DES VENTES']);
-  lignes.push(['Heure', 'Articles', 'Total brut (€)', 'Remise (%)', 'Total net (€)', 'Mode de paiement']);
+  lignes.push(separateur);
+  lignes.push(['Heure', 'Articles', 'Total brut', 'Remise', 'Total net', 'Mode de paiement']);
   ventes.forEach(v => {
     let articlesTxt = '';
     try{
@@ -969,8 +988,9 @@ function writeCSV(sess, ventes, label){
     }catch(e){}
     let heure = v.horodatage;
     try{ heure = new Date(v.horodatage).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }catch(e){}
-    lignes.push([heure, articlesTxt, (v.total_brut||0).toFixed(2), v.remise_pourcent||0, (v.total_net||0).toFixed(2), modePaiementLabel(v.mode_paiement)]);
+    lignes.push([heure, articlesTxt, fmtMoney(v.total_brut||0), fmtPct(v.remise_pourcent), fmtMoney(v.total_net||0), modePaiementLabel(v.mode_paiement)]);
   });
+  lignes.push(['', '', fmtMoney(totalBrut), '', fmtMoney(totalNet), 'TOTAL']);
 
   const csv = lignes.map(row => row.map(csvEscape).join(';')).join('\n');
   const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
