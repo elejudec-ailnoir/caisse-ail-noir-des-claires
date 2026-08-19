@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#4B4B4B"/>
+  <!-- mouettes -->
+  <path d="M150 190 Q185 160 220 190 Q255 160 290 190" fill="none" stroke="#FDFCFA" stroke-width="10" stroke-linecap="round"/>
+  <path d="M230 220 Q265 190 300 220 Q335 190 370 220" fill="none" stroke="#FDFCFA" stroke-width="10" stroke-linecap="round"/>
+  <!-- vague "eau des Claires" -->
+  <path d="M120 340 Q160 315 200 340 Q240 365 280 340 Q320 315 360 340 Q380 352 392 340"
+        fill="none" stroke="#74BCC4" stroke-width="14" stroke-linecap="round"/>
+  <path d="M120 380 Q160 355 200 380 Q240 405 280 380 Q320 355 360 380 Q380 392 392 380"
+        fill="none" stroke="#74BCC4" stroke-width="14" stroke-linecap="round" opacity="0.7"/>
+</svg>

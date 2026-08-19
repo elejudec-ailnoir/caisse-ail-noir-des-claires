@@ -1,0 +1,14 @@
+{
+  "name": "Caisse — Ail noir des claires",
+  "short_name": "Caisse",
+  "description": "Caisse enregistreuse mobile pour la vente sur les marchés — Ail noir des claires",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#4B4B4B",
+  "theme_color": "#4B4B4B",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
