@@ -1006,12 +1006,25 @@ function initApp(){
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
   try{ db.enablePersistence({ synchronizeTabs:true }).catch(()=>{}); }catch(e){}
-  firebase.auth().signInAnonymously().catch(() => {
-    toast('Connexion initiale impossible — vérifiez le réseau', true);
-  });
 
   prodGrid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="em-ic">☁️</div>Connexion au catalogue partagé…</div>`;
 
+  // On attend que la connexion anonyme soit VRAIMENT établie avant de lire/écrire
+  // dans Firestore — sinon les règles de sécurité refusent la lecture (l'app
+  // affichait alors à tort "vérifiez votre réseau").
+  let listenersAttached = false;
+  firebase.auth().onAuthStateChanged(user => {
+    if(user && !listenersAttached){
+      listenersAttached = true;
+      attachFirestoreListeners();
+    }
+  });
+  firebase.auth().signInAnonymously().catch(() => {
+    toast('Connexion initiale impossible — vérifiez le réseau', true);
+  });
+}
+
+function attachFirestoreListeners(){
   let catalogueSeeded = false;
   db.collection('catalogue').onSnapshot(snap => {
     catalogueDocs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -1039,6 +1052,15 @@ updateSessionInfo();
 initApp();
 
 if('serviceWorker' in navigator){
+  // Dès qu'une nouvelle version du service worker prend le relais, on recharge
+  // la page une seule fois pour afficher automatiquement la dernière version —
+  // plus besoin de vider le cache ou l'historique manuellement.
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(()=>{ /* offline / file:// — ignore */ });
   });
