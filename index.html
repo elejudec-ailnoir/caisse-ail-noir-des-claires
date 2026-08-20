@@ -196,7 +196,8 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 .remise-input-wrap .remise-pct{ color:var(--text-lo); font-size:13px; font-weight:600; }
 .remise-row .chip{ flex:0 0 auto; padding:9px 13px; min-width:0; font-size:12px; }
 
-.pay-row{ display:flex; gap:6px; }
+.pay-row{ display:flex; gap:6px; max-height:60px; overflow:hidden; transition:max-height .18s ease, opacity .18s ease, margin .18s ease; opacity:1; }
+.pay-row.pay-row-hidden{ max-height:0; opacity:0; margin:0; pointer-events:none; }
 .pay-btn{
   flex:1; padding:11px 4px; border-radius:12px; border:1px solid var(--border-hi);
   background:var(--bg-surface-hi); color:var(--text-lo); font-size:12.5px; font-weight:700;
@@ -228,6 +229,13 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 }
 .close-session-btn:active{ background:rgba(192,122,69,0.34); }
 .close-session-btn.show{ display:flex; }
+.open-session-btn{
+  display:none; align-items:center; gap:5px; height:38px; padding:0 13px; border-radius:11px;
+  background:rgba(92,168,140,0.20); border:1px solid var(--accent-emerald-hi); color:#D6F0E4;
+  font-size:12.5px; font-weight:700; white-space:nowrap; touch-action:manipulation;
+}
+.open-session-btn:active{ background:rgba(92,168,140,0.34); }
+.open-session-btn.show{ display:flex; }
 .pill{
   font-size:11px; padding:3px 9px; border-radius:99px; font-weight:600; letter-spacing:.02em;
 }
@@ -304,6 +312,13 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 .badge-status{ font-size:10.5px; padding:2px 8px; border-radius:99px; font-weight:700; }
 
 .plist-row{ display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--border-soft); }
+.reorder-col{ display:flex; flex-direction:column; gap:2px; flex:0 0 auto; }
+.reorder-btn{
+  width:26px; height:20px; border-radius:6px; background:var(--bg-surface-hi); border:1px solid var(--border-soft);
+  color:var(--text-lo); display:flex; align-items:center; justify-content:center; touch-action:manipulation;
+}
+.reorder-btn:active{ background:var(--border-hi); }
+.reorder-btn:disabled{ opacity:0.25; }
 .plist-row img, .plist-row .ph{ width:44px; height:44px; border-radius:9px; object-fit:cover; background:var(--bg-surface-hi); flex:0 0 auto; }
 
 .config-warning{
@@ -337,6 +352,9 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
       <div id="sessionInfo" style="font-size:11.5px; color:var(--text-lo); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex:0 0 auto;">
+      <button id="openSessionBtn" class="open-session-btn" onclick="openSheet('sheetSession')" title="Ouvrir une session">
+        🏪 Ouvrir
+      </button>
       <button id="closeSessionBtn" class="close-session-btn" onclick="closeSession()" title="Clôturer la session">
         🏁 Clôturer
       </button>
@@ -529,12 +547,12 @@ function load(key, fallback){
 function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.warn('LS save failed', e); } }
 
 const SEED_PRODUCTS = [
-  { nom:"Tête d'ail noir", prix_unitaire:6.90, photo_url:'' },
-  { nom:"Gousses d'ail noir (sachet)", prix_unitaire:4.50, photo_url:'' },
-  { nom:"Miel à l'ail noir", prix_unitaire:8.50, photo_url:'' },
-  { nom:"Huile de tournesol à l'ail noir", prix_unitaire:9.90, photo_url:'' },
-  { nom:"Fleur de sel à l'ail noir", prix_unitaire:5.90, photo_url:'' },
-  { nom:'Bourriche à composer', prix_unitaire:15.00 },
+  { nom:"Tête d'ail noir", prix_unitaire:6.90, photo_url:'', ordre:0 },
+  { nom:"Gousses d'ail noir (sachet)", prix_unitaire:4.50, photo_url:'', ordre:1 },
+  { nom:"Miel à l'ail noir", prix_unitaire:8.50, photo_url:'', ordre:2 },
+  { nom:"Huile de tournesol à l'ail noir", prix_unitaire:9.90, photo_url:'', ordre:3 },
+  { nom:"Fleur de sel à l'ail noir", prix_unitaire:5.90, photo_url:'', ordre:4 },
+  { nom:'Bourriche à composer', prix_unitaire:15.00, ordre:5 },
 ];
 
 /* Pré-remplissage de la liste des marchés (une seule fois, si la base partagée
@@ -565,10 +583,13 @@ function activeSession(){ return state.sessions.find(s => s.statut === 'Active')
 
 function rebuildProducts(){
   const qtyById = Object.fromEntries(state.products.map(p => [p.id, p.quantite_panier||0]));
-  state.products = catalogueDocs.map(d => ({
+  const withOrdre = catalogueDocs.map((d, i) => ({
     id: d.id, nom: d.nom, prix_unitaire: d.prix_unitaire, photo_url: d.photo_url || '',
+    ordre: (typeof d.ordre === 'number') ? d.ordre : 10000 + i,  // produits existants sans ordre → à la fin, ordre stable
     quantite_panier: qtyById[d.id] || 0
   }));
+  withOrdre.sort((a,b) => a.ordre - b.ordre);
+  state.products = withOrdre;
 }
 
 /* Dernier récap clôturé, gardé UNIQUEMENT en mémoire vive (jamais sauvegardé) —
@@ -708,6 +729,7 @@ function updateDock(){
   if(document.activeElement !== netInput){
     netInput.value = net.toFixed(2).replace('.', ',');
   }
+  document.getElementById('payRow').classList.toggle('pay-row-hidden', count>0 && round2(net)===0);
   document.getElementById('confirmBtn').disabled = count===0;
 }
 
@@ -721,6 +743,8 @@ function confirmSale(){
   // Remise effective enregistrée pour l'historique/export : dérivée du net réellement
   // appliqué (couvre aussi bien le % choisi que le montant net saisi manuellement).
   const remiseEffective = brut > 0 ? round2((1 - net/brut) * 100) : 0;
+  const estGratuit = round2(net) === 0;
+  const modePaiementFinal = estGratuit ? 'Gratuit' : state.paiement;
 
   const vente = {
     id_vente: uid('vente'),
@@ -730,14 +754,16 @@ function confirmSale(){
     total_brut: round2(brut),
     remise_pourcent: remiseEffective,
     total_net: round2(net),
-    mode_paiement: state.paiement,
+    mode_paiement: modePaiementFinal,
   };
   state.ventes.push(vente);
 
   sess.total_ca = round2(sess.total_ca + net);
-  if(state.paiement === 'Especes') sess.total_especes = round2(sess.total_especes + net);
-  else if(state.paiement === 'CB') sess.total_cb = round2(sess.total_cb + net);
-  else sess.total_cheque = round2((sess.total_cheque||0) + net);
+  if(!estGratuit){
+    if(state.paiement === 'Especes') sess.total_especes = round2(sess.total_especes + net);
+    else if(state.paiement === 'CB') sess.total_cb = round2(sess.total_cb + net);
+    else sess.total_cheque = round2((sess.total_cheque||0) + net);
+  }
 
   state.products.forEach(p => p.quantite_panier = 0);
   renderGrid();
@@ -796,14 +822,17 @@ function updateSessionInfo(){
   const menuSub = document.getElementById('menuSessionSub');
   const menuProd = document.getElementById('menuProdSub');
   const closeBtn = document.getElementById('closeSessionBtn');
+  const openBtn = document.getElementById('openSessionBtn');
   if(sess){
     infoEl.innerHTML = `<span class="pill on" style="margin-right:6px;">● Active</span>${escHtml(sess.lieu_marche)} · ${fmtDate(sess.date_session)}`;
     menuSub.textContent = `${sess.lieu_marche} — CA: ${eur(sess.total_ca)}`;
     closeBtn.classList.add('show');
+    openBtn.classList.remove('show');
   } else {
     infoEl.innerHTML = `<span class="pill off">○ Aucune session</span>`;
     menuSub.textContent = 'Aucune session active — appuyez pour démarrer';
     closeBtn.classList.remove('show');
+    openBtn.classList.add('show');
   }
   menuProd.textContent = `${state.products.length} produit(s) — catalogue partagé`;
 }
@@ -855,7 +884,13 @@ async function startSession(){
   if(lieu === '__new__'){
     lieu = document.getElementById('ns_lieu_new').value.trim();
     if(!lieu){ toast('Indiquez un nom de marché', true); return; }
-    addMarche(lieu);
+    if(!state.marches.includes(lieu)){
+      const ajouter = await askConfirm(
+        "Il sera proposé directement la prochaine fois, sur tous les appareils. Sinon, ce nom ne sert que pour cette session-ci.",
+        `Ajouter "${lieu}" à la liste des marchés ?`
+      );
+      if(ajouter) addMarche(lieu);
+    }
   }
   const date = document.getElementById('ns_date').value || todayISO();
   if(activeSession()){ toast('Une session est déjà active', true); return; }
@@ -928,8 +963,17 @@ async function sendRecapByEmail(sess, ventes, silencieux){
 function renderProductList(){
   const el = document.getElementById('productList');
   if(state.products.length===0){ el.innerHTML = `<div class="empty-state"><div class="em-ic">🛒</div>Catalogue vide</div>`; return; }
-  el.innerHTML = state.products.map(p => `
+  const n = state.products.length;
+  el.innerHTML = state.products.map((p,i) => `
     <div class="plist-row">
+      <div class="reorder-col">
+        <button class="reorder-btn" onclick="moveProduct('${p.id}', -1)" ${i===0?'disabled':''} title="Monter">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+        </button>
+        <button class="reorder-btn" onclick="moveProduct('${p.id}', 1)" ${i===n-1?'disabled':''} title="Descendre">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
       ${p.photo_url ? `<img src="${escAttr(p.photo_url)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph'}))">` : `<div class="ph"></div>`}
       <div style="flex:1; min-width:0;">
         <div style="font-weight:600; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(p.nom)}</div>
@@ -940,6 +984,20 @@ function renderProductList(){
       </button>
     </div>
   `).join('');
+}
+async function moveProduct(id, direction){
+  const arr = [...state.products];
+  const idx = arr.findIndex(p => p.id === id);
+  const swapIdx = idx + direction;
+  if(idx<0 || swapIdx<0 || swapIdx>=arr.length) return;
+  [arr[idx], arr[swapIdx]] = [arr[swapIdx], arr[idx]];
+  try{
+    const batch = db.batch();
+    arr.forEach((p, i) => batch.update(db.collection('catalogue').doc(p.id), { ordre: i }));
+    await batch.commit();
+  }catch(e){
+    toast('Erreur réseau — réessayez', true);
+  }
 }
 let editingProdId = null;
 function openProductForm(id){
@@ -970,7 +1028,8 @@ async function saveProductForm(){
     if(editingProdId){
       await db.collection('catalogue').doc(editingProdId).update({ nom, prix_unitaire:prix, photo_url:photo });
     } else {
-      await db.collection('catalogue').add({ nom, prix_unitaire:prix, photo_url:photo });
+      const maxOrdre = state.products.reduce((m,p) => Math.max(m, p.ordre||0), -1);
+      await db.collection('catalogue').add({ nom, prix_unitaire:prix, photo_url:photo, ordre: maxOrdre + 1 });
     }
     closeSheet('sheetProdForm');
     toast('Produit enregistré (partagé sur tous les appareils)');
@@ -1143,7 +1202,7 @@ function buildCSVString(sess, ventes){
   return lignes.map(row => row.map(csvEscape).join(';')).join('\n');
 }
 function modePaiementLabel(m){
-  return m === 'Especes' ? 'Espèces' : m === 'CB' ? 'CB' : m === 'Cheque' ? 'Chèque' : (m||'');
+  return m === 'Especes' ? 'Espèces' : m === 'CB' ? 'CB' : m === 'Cheque' ? 'Chèque' : m === 'Gratuit' ? 'Gratuit' : (m||'');
 }
 function csvEscape(v){
   const s = String(v??'');
