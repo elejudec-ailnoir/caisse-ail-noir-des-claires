@@ -111,6 +111,26 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
   background:linear-gradient(135deg,var(--bg-surface-hi),var(--bg-surface));
   color:var(--text-faint); font-size:11px; letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
 }
+.card-photo-wrap{ position:relative; }
+.qty-badge{
+  position:absolute; top:7px; right:7px; min-width:26px; height:26px; padding:0 6px;
+  border-radius:99px; background:var(--accent-copper); color:#1A1204; font-family:Arial, Helvetica, sans-serif;
+  font-weight:800; font-size:14px; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.45); opacity:0; transform:scale(0.5); transition:opacity .15s, transform .15s;
+  pointer-events:none; z-index:2;
+}
+.qty-badge.show{ opacity:1; transform:scale(1); }
+.qty-badge.bump{ animation:qtyBump .28s cubic-bezier(.34,1.56,.64,1); }
+@keyframes qtyBump{
+  0%{ transform:scale(1); }
+  40%{ transform:scale(1.45); }
+  100%{ transform:scale(1); }
+}
+.card-flash{
+  position:absolute; inset:0; background:var(--accent-copper); opacity:0; pointer-events:none;
+  transition:opacity .35s ease-out; z-index:1; mix-blend-mode:overlay;
+}
+.card-flash.flash{ opacity:0.55; transition:none; }
 .card-body{ padding:9px 10px 10px; display:flex; flex-direction:column; gap:6px; flex:1;}
 .card-nom{ font-size:13.5px; font-weight:600; line-height:1.25; color:var(--text-hi); }
 .card-prix{ font-size:14px; color:var(--accent-copper); font-weight:600; }
@@ -140,8 +160,16 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 }
 .dock-line{ text-align:right; font-size:13px; color:var(--text-lo); }
 .dock-line .dock-line-label{ color:var(--text-faint); margin-right:4px; }
-.dock-line.net-line{ font-size:20px; font-weight:700; color:var(--accent-emerald-hi); margin-top:2px; }
+.dock-line.net-line{ font-size:20px; font-weight:700; color:var(--accent-emerald-hi); margin-top:2px; display:flex; justify-content:flex-end; align-items:baseline; gap:6px; }
 .dock-line.net-line .dock-line-label{ font-size:13px; font-weight:600; color:var(--text-hi); margin-right:6px; }
+.net-edit-wrap{ display:inline-flex; align-items:baseline; gap:3px; }
+.net-edit-wrap input{
+  width:110px; text-align:right; background:transparent; border:none;
+  border-bottom:1.5px dashed var(--accent-emerald-hi); font-family:Arial, Helvetica, sans-serif;
+  font-size:20px; font-weight:700; color:var(--accent-emerald-hi); padding:0 2px;
+}
+.net-edit-wrap input:focus{ outline:none; border-bottom-style:solid; }
+.net-edit-wrap .net-edit-suffix{ font-size:15px; }
 
 .chip{
   flex:1 0 auto; padding:8px 4px; border-radius:10px; border:1px solid var(--border-hi);
@@ -166,7 +194,7 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
 .remise-input-wrap input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 .remise-input-wrap input::placeholder{ color:var(--text-faint); }
 .remise-input-wrap .remise-pct{ color:var(--text-lo); font-size:13px; font-weight:600; }
-.remise-row .chip{ flex:0 0 auto; padding:9px 18px; min-width:0; }
+.remise-row .chip{ flex:0 0 auto; padding:9px 13px; min-width:0; font-size:12px; }
 
 .pay-row{ display:flex; gap:6px; }
 .pay-btn{
@@ -193,6 +221,13 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
   border:1px solid var(--border-soft); color:var(--text-hi); display:flex; align-items:center; justify-content:center;
 }
 .icon-btn:active{ background:var(--bg-surface); }
+.close-session-btn{
+  display:none; align-items:center; gap:5px; height:38px; padding:0 13px; border-radius:11px;
+  background:rgba(192,122,69,0.20); border:1px solid var(--accent-danger); color:#F0DDC8;
+  font-size:12.5px; font-weight:700; white-space:nowrap; touch-action:manipulation;
+}
+.close-session-btn:active{ background:rgba(192,122,69,0.34); }
+.close-session-btn.show{ display:flex; }
 .pill{
   font-size:11px; padding:3px 9px; border-radius:99px; font-weight:600; letter-spacing:.02em;
 }
@@ -302,6 +337,9 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
       <div id="sessionInfo" style="font-size:11.5px; color:var(--text-lo); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex:0 0 auto;">
+      <button id="closeSessionBtn" class="close-session-btn" onclick="closeSession()" title="Clôturer la session">
+        🏁 Clôturer
+      </button>
       <button class="icon-btn" onclick="openSheet('sheetProducts')" title="Produits">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
       </button>
@@ -329,10 +367,17 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
         <span class="remise-pct">%</span>
       </div>
       <button class="chip" id="chip10" onclick="toggleChipRemise(10)">10%</button>
+      <button class="chip" id="chip15" onclick="toggleChipRemise(15)">15%</button>
       <button class="chip free" id="chipGratuit" onclick="toggleChipRemise(100)">GRATUIT</button>
     </div>
 
-    <div class="dock-line net-line"><span class="dock-line-label">Total net :</span> <span id="netVal">0,00 €</span></div>
+    <div class="dock-line net-line">
+      <span class="dock-line-label">Total net :</span>
+      <span class="net-edit-wrap">
+        <input id="netInput" type="text" inputmode="decimal" placeholder="0,00" oninput="onNetInput(this.value)" onfocus="this.select()">
+        <span class="net-edit-suffix">€</span>
+      </span>
+    </div>
 
     <div class="pay-row" id="payRow">
       <button class="pay-btn active" data-pay="Especes" onclick="setPay('Especes')">💶 Espèces</button>
@@ -399,7 +444,7 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
   <div class="sheet" id="sheetProdForm">
     <h2 id="prodFormTitle">Nouveau produit</h2>
     <div class="field"><label>Nom</label><input id="pf_nom" type="text" placeholder="Ex : Tomates anciennes"></div>
-    <div class="field"><label>Prix unitaire (€)</label><input id="pf_prix" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.00"></div>
+    <div class="field"><label>Prix unitaire (€)</label><input id="pf_prix" type="text" inputmode="decimal" placeholder="0,00"></div>
     <div class="field"><label>Photo (URL, optionnel)</label><input id="pf_photo" type="text" placeholder="https://..."></div>
     <div class="btn-row" style="margin-top:6px;">
       <button class="btn btn-secondary" onclick="closeSheet('sheetProdForm')">Annuler</button>
@@ -417,19 +462,6 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="resolveConfirm(false)">Annuler</button>
       <button class="btn btn-danger" onclick="resolveConfirm(true)">Confirmer</button>
-    </div>
-  </div>
-</div>
-
-<!-- SHEET: RÉCAP DE CLÔTURE (apparaît automatiquement après la clôture d'une session) -->
-<div class="sheet-backdrop center" id="sheetRecap-bd" onclick="if(event.target===this)closeSheet('sheetRecap')">
-  <div class="sheet" id="sheetRecap">
-    <h2>Session clôturée ✓</h2>
-    <p class="sheet-sub" id="recapSub"></p>
-    <div style="background:var(--bg-surface); border:1px solid var(--border-soft); border-radius:14px; padding:14px; margin-bottom:14px;" id="recapDetail"></div>
-    <div class="btn-row">
-      <button class="btn btn-secondary" onclick="closeSheet('sheetRecap')">Fermer</button>
-      <button class="btn btn-primary" onclick="exportRecapCSV()">Exporter le récap (CSV)</button>
     </div>
   </div>
 </div>
@@ -453,7 +485,7 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
    Une session clôturée est immédiatement purgée après son récap/export.
    ============================================================ */
 
-const LS_KEYS = { sessions:'pos_sessions', ventes:'pos_ventes' };
+const LS_KEYS = { sessions:'pos_sessions', ventes:'pos_ventes', settings:'pos_settings' };
 
 const uid = (p) => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const eur = (n) => (Math.round((n+Number.EPSILON)*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
@@ -494,19 +526,30 @@ const SEED_PRODUCTS = [
   { nom:'Bourriche à composer', prix_unitaire:15.00 },
 ];
 
+/* Pré-remplissage de la liste des marchés (une seule fois, si la base partagée
+   est vide) — à compléter avec vos vrais lieux de marché habituels. */
+const SEED_MARCHES = [
+  // "Marché de La Palmyre",
+  // "Marché de Royan",
+  // "Marché de Rochefort",
+];
+
 let catalogueDocs = [];   // catalogue partagé (Firestore), reçu en direct
 let state = {
   products: [],            // catalogueDocs + quantite_panier local (fusion à chaque snapshot)
   marches: [],              // liste des marchés partagée (Firestore)
   sessions: load(LS_KEYS.sessions, []),   // ne contient jamais plus d'une session (l'active) — local
   ventes: load(LS_KEYS.ventes, []),       // uniquement les ventes de la session active — local
+  settings: load(LS_KEYS.settings, { email_webhook_url:'' }),  // réglages locaux à cet appareil
   remise: 0,
+  netOverride: null,   // si non-null, montant net saisi manuellement (prioritaire sur la remise %)
   paiement: 'Especes',
 };
 
 function persistAll(){
   save(LS_KEYS.sessions, state.sessions);
   save(LS_KEYS.ventes, state.ventes);
+  save(LS_KEYS.settings, state.settings);
 }
 
 function activeSession(){ return state.sessions.find(s => s.statut === 'Active') || null; }
@@ -527,10 +570,14 @@ let lastClosedRecap = null;
 const prodGrid = document.getElementById('prodGrid');
 
 function photoBlock(p){
-  if(p.photo_url){
-    return `<img class="card-photo" src="${escAttr(p.photo_url)}" loading="lazy" onclick="incQty('${p.id}')" onerror="this.outerHTML=fallbackPhotoHTML('${escAttr(p.nom)}','${p.id}')">`;
-  }
-  return fallbackPhotoHTML(p.nom, p.id);
+  const inner = p.photo_url
+    ? `<img class="card-photo" src="${escAttr(p.photo_url)}" loading="lazy" onclick="incQty('${p.id}')" onerror="this.outerHTML=fallbackPhotoHTML('${escAttr(p.nom)}','${p.id}')">`
+    : fallbackPhotoHTML(p.nom, p.id);
+  return `<div class="card-photo-wrap">
+    ${inner}
+    <div class="card-flash" id="flash_${p.id}"></div>
+    <div class="qty-badge ${p.quantite_panier>0?'show':''}" id="badge_${p.id}">${p.quantite_panier}</div>
+  </div>`;
 }
 function fallbackPhotoHTML(nom, id){
   const initials = (nom||'?').trim().slice(0,2).toUpperCase();
@@ -563,41 +610,72 @@ function findProd(id){ return state.products.find(p => p.id === id); }
 function incQty(id){
   const p = findProd(id); if(!p) return;
   p.quantite_panier++;
-  updateCardQty(p);
+  state.netOverride = null;
+  updateCardQty(p, true);
   updateDock();
 }
 function decQty(id){
   const p = findProd(id); if(!p) return;
   if(p.quantite_panier>0) p.quantite_panier--;
-  updateCardQty(p);
+  state.netOverride = null;
+  updateCardQty(p, false);
   updateDock();
 }
-function updateCardQty(p){
+function updateCardQty(p, isAdd){
   const card = document.getElementById('card_'+p.id);
   const val = document.getElementById('qtyval_'+p.id);
+  const badge = document.getElementById('badge_'+p.id);
+  const flash = document.getElementById('flash_'+p.id);
   if(val){ val.textContent = p.quantite_panier; val.classList.toggle('nonzero', p.quantite_panier>0); }
   if(card){ card.classList.toggle('has-qty', p.quantite_panier>0); }
+  if(badge){
+    badge.textContent = p.quantite_panier;
+    badge.classList.toggle('show', p.quantite_panier>0);
+    badge.classList.remove('bump');
+    void badge.offsetWidth; // force le redémarrage de l'animation à chaque changement
+    if(p.quantite_panier>0) badge.classList.add('bump');
+  }
+  if(flash && isAdd){
+    flash.classList.remove('flash');
+    void flash.offsetWidth;
+    flash.classList.add('flash');
+    setTimeout(() => flash.classList.remove('flash'), 260);
+  }
 }
 
 /* ---------- dock / cart logic ---------- */
-/* Remise libre : saisie directe (0-100), ou raccourcis 10% / GRATUIT qui se
-   sélectionnent au clic et se désélectionnent (retour à 0%) à un nouveau clic. */
+/* Remise libre : saisie directe (0-100), ou raccourcis 10% / 15% / GRATUIT qui se
+   sélectionnent au clic et se désélectionnent (retour à 0%) à un nouveau clic.
+   Le total net peut aussi être édité directement (prioritaire sur la remise %,
+   tant que le panier n'est pas modifié). */
 function clampPct(n){ return Math.max(0, Math.min(100, isNaN(n) ? 0 : n)); }
 function syncRemiseUI(){
   const input = document.getElementById('remiseInput');
   input.value = state.remise === 0 ? '' : state.remise;
   document.getElementById('chip10').classList.toggle('active', state.remise === 10);
+  document.getElementById('chip15').classList.toggle('active', state.remise === 15);
   document.getElementById('chipGratuit').classList.toggle('active', state.remise === 100);
 }
 function onRemiseInput(val){
   state.remise = clampPct(parseFloat(val));
+  state.netOverride = null;
   document.getElementById('chip10').classList.toggle('active', state.remise === 10);
+  document.getElementById('chip15').classList.toggle('active', state.remise === 15);
   document.getElementById('chipGratuit').classList.toggle('active', state.remise === 100);
   updateDock();
 }
 function toggleChipRemise(val){
   state.remise = (state.remise === val) ? 0 : val;
+  state.netOverride = null;
   syncRemiseUI();
+  updateDock();
+}
+function onNetInput(val){
+  const brut = cartLines().reduce((s,p)=>s+p.quantite_panier*p.prix_unitaire,0);
+  let n = parseFloat(String(val).replace(',', '.'));
+  if(isNaN(n)) n = 0;
+  n = Math.max(0, Math.min(brut, n));
+  state.netOverride = n;
   updateDock();
 }
 function setPay(mode){
@@ -610,14 +688,17 @@ function cartTotals(){
   const lines = cartLines();
   const count = lines.reduce((s,p)=>s+p.quantite_panier,0);
   const brut = lines.reduce((s,p)=>s+p.quantite_panier*p.prix_unitaire,0);
-  const net = brut * (1 - state.remise/100);
+  const net = (state.netOverride !== null) ? state.netOverride : brut * (1 - state.remise/100);
   return { count, brut, net };
 }
 function updateDock(){
   const { count, brut, net } = cartTotals();
   document.getElementById('artCount').textContent = count + (count>1?' articles':' article');
   document.getElementById('brutVal').textContent = eur(brut);
-  document.getElementById('netVal').textContent = eur(net);
+  const netInput = document.getElementById('netInput');
+  if(document.activeElement !== netInput){
+    netInput.value = net.toFixed(2).replace('.', ',');
+  }
   document.getElementById('confirmBtn').disabled = count===0;
 }
 
@@ -628,6 +709,9 @@ function confirmSale(){
   const lines = cartLines();
   if(lines.length===0) return;
   const { brut, net } = cartTotals();
+  // Remise effective enregistrée pour l'historique/export : dérivée du net réellement
+  // appliqué (couvre aussi bien le % choisi que le montant net saisi manuellement).
+  const remiseEffective = brut > 0 ? round2((1 - net/brut) * 100) : 0;
 
   const vente = {
     id_vente: uid('vente'),
@@ -635,7 +719,7 @@ function confirmSale(){
     horodatage: new Date().toISOString(),
     detail_articles: JSON.stringify(lines.map(p => ({ id:p.id, nom:p.nom, prix_unitaire:p.prix_unitaire, quantite:p.quantite_panier }))),
     total_brut: round2(brut),
-    remise_pourcent: state.remise,
+    remise_pourcent: remiseEffective,
     total_net: round2(net),
     mode_paiement: state.paiement,
   };
@@ -649,6 +733,7 @@ function confirmSale(){
   state.products.forEach(p => p.quantite_panier = 0);
   renderGrid();
   state.remise = 0;
+  state.netOverride = null;
   syncRemiseUI();
   state.paiement = 'Especes';
   document.querySelectorAll('.pay-btn').forEach(b => b.classList.toggle('active', b.dataset.pay==='Especes'));
@@ -701,12 +786,15 @@ function updateSessionInfo(){
   const infoEl = document.getElementById('sessionInfo');
   const menuSub = document.getElementById('menuSessionSub');
   const menuProd = document.getElementById('menuProdSub');
+  const closeBtn = document.getElementById('closeSessionBtn');
   if(sess){
     infoEl.innerHTML = `<span class="pill on" style="margin-right:6px;">● Active</span>${escHtml(sess.lieu_marche)} · ${fmtDate(sess.date_session)}`;
     menuSub.textContent = `${sess.lieu_marche} — CA: ${eur(sess.total_ca)}`;
+    closeBtn.classList.add('show');
   } else {
     infoEl.innerHTML = `<span class="pill off">○ Aucune session</span>`;
     menuSub.textContent = 'Aucune session active — appuyez pour démarrer';
+    closeBtn.classList.remove('show');
   }
   menuProd.textContent = `${state.products.length} produit(s) — catalogue partagé`;
 }
@@ -776,33 +864,56 @@ async function closeSession(){
   lastClosedRecap = { session: { ...sess, statut:'Clôturée' }, ventes: ventesSession.map(v => ({ ...v })) };
 
   // Rien n'est conservé durablement après clôture : purge immédiate de la session
-  // et de ses ventes. Le récap ci-dessous ne vit qu'en mémoire vive.
+  // et de ses ventes. lastClosedRecap ne vit qu'en mémoire vive (filet de sécurité
+  // pour un renvoi manuel depuis Menu → Export en cas d'échec de l'envoi mail).
   state.sessions = state.sessions.filter(s => s.id_session !== sess.id_session);
   state.ventes = state.ventes.filter(v => v.id_session !== sess.id_session);
   persistAll();
 
   updateSessionInfo();
   closeSheet('sheetSession');
-  showRecap(lastClosedRecap.session, lastClosedRecap.ventes.length);
+
+  if(state.settings.email_webhook_url){
+    toast('Session clôturée — envoi du récap…');
+    const res = await postRecapEmail(lastClosedRecap.session, lastClosedRecap.ventes);
+    toast(
+      res.ok
+        ? `Récap envoyé par e-mail ✓ (CA : ${eur(lastClosedRecap.session.total_ca)})`
+        : `Session clôturée · échec de l'envoi mail (CA : ${eur(lastClosedRecap.session.total_ca)}) — réessayez depuis Menu → Export`,
+      !res.ok
+    );
+  } else {
+    toast(`Session clôturée — CA : ${eur(lastClosedRecap.session.total_ca)} (aucun envoi mail configuré)`, true);
+  }
 }
 
-/* ---------- récap de clôture ---------- */
-function showRecap(sess, nbVentes){
-  document.getElementById('recapSub').textContent = `${escHtml(sess.lieu_marche)} · ${fmtDate(sess.date_session)}`;
-  document.getElementById('recapDetail').innerHTML = `
-    <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Ventes</span><span class="font-mono">${nbVentes}</span></div>
-    <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Espèces</span><span class="font-mono">${eur(sess.total_especes)}</span></div>
-    <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">CB</span><span class="font-mono">${eur(sess.total_cb)}</span></div>
-    <div class="hist-row"><span style="color:var(--text-lo); font-size:13px;">Chèque</span><span class="font-mono">${eur(sess.total_cheque||0)}</span></div>
-    <div class="hist-row" style="border-bottom:none;"><span style="font-weight:700;">Chiffre d'affaires</span><span class="font-mono" style="color:var(--accent-emerald-hi); font-weight:700; font-size:16px;">${eur(sess.total_ca)}</span></div>
-  `;
-  openSheet('sheetRecap');
-}
-function exportRecapCSV(){
-  if(lastClosedRecap){
-    writeCSV(lastClosedRecap.session, lastClosedRecap.ventes, (lastClosedRecap.session.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + lastClosedRecap.session.date_session);
+/* ---------- envoi du récap par e-mail (systématique à la clôture, si configuré) ---------- */
+async function postRecapEmail(sess, ventes){
+  const url = state.settings.email_webhook_url;
+  if(!url) return { ok:false, reason:'no-url' };
+  const label = (sess.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + sess.date_session;
+  const csv = buildCSVString(sess, ventes);
+  try{
+    await fetch(url, {
+      method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        csv,
+        filename: `ventes_${label}.csv`,
+        subject: `Récap de vente — ${sess.lieu_marche} (${fmtDate(sess.date_session)})`,
+        body: `Récapitulatif de la session "${sess.lieu_marche}" du ${fmtDate(sess.date_session)}.\nChiffre d'affaires : ${eur(sess.total_ca)}.\nLe détail complet est en pièce jointe (CSV).`
+      })
+    });
+    return { ok:true };
+  }catch(e){
+    return { ok:false, reason:'network' };
   }
-  closeSheet('sheetRecap');
+}
+/* Variante utilisée par le bouton "Tester maintenant" de l'écran Export (avec ses propres toasts) */
+async function sendRecapByEmail(sess, ventes, silencieux){
+  if(!state.settings.email_webhook_url){ if(!silencieux) toast('Aucune adresse d\'envoi configurée', true); return; }
+  if(!silencieux) toast('Envoi du récap par e-mail…');
+  const res = await postRecapEmail(sess, ventes);
+  if(!silencieux) toast(res.ok ? 'Récap envoyé par e-mail ✓' : 'Échec de l\'envoi mail', !res.ok);
 }
 
 /* ---------- product management ---------- */
@@ -830,7 +941,7 @@ function openProductForm(id){
     const p = findProd(id);
     document.getElementById('prodFormTitle').textContent = 'Modifier le produit';
     document.getElementById('pf_nom').value = p.nom;
-    document.getElementById('pf_prix').value = p.prix_unitaire;
+    document.getElementById('pf_prix').value = String(p.prix_unitaire).replace('.', ',');
     document.getElementById('pf_photo').value = p.photo_url;
     del.style.display = 'flex';
   } else {
@@ -844,7 +955,7 @@ function openProductForm(id){
 }
 async function saveProductForm(){
   const nom = document.getElementById('pf_nom').value.trim();
-  const prix = parseFloat(document.getElementById('pf_prix').value);
+  const prix = parseFloat(document.getElementById('pf_prix').value.replace(',', '.'));
   const photo = document.getElementById('pf_photo').value.trim();
   if(!nom || isNaN(prix) || prix<0){ toast('Nom et prix valides requis', true); return; }
   try{
@@ -901,7 +1012,31 @@ function renderExportSheet(){
     html = `<div class="empty-state"><div class="em-ic">📤</div>Rien à exporter pour l'instant</div>`;
   }
   html += `<p class="sheet-sub" style="margin-top:14px;">Rien n'est conservé au-delà de la session en cours : une fois exportée puis fermée, une session clôturée n'est plus récupérable dans l'app.</p>`;
+
+  html += `
+    <div style="height:1px; background:var(--border-soft); margin:16px 0;"></div>
+    <div class="field">
+      <label>Envoi automatique du récap à e.lejudec@gmail.com</label>
+      <input id="emailWebhookUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec" value="${escAttr(state.settings.email_webhook_url||'')}">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="saveEmailWebhook()">Enregistrer</button>
+      ${lastClosedRecap ? '<button class="btn btn-primary" onclick="testEmailNow()">Tester maintenant</button>' : ''}
+    </div>
+    <p class="sheet-sub" style="margin-top:8px;">Une fois cette URL enregistrée, <strong>chaque clôture de session envoie automatiquement</strong> le récap CSV à e.lejudec@gmail.com — systématiquement, sans action supplémentaire. L'export manuel reste aussi disponible en plus. Voir GUIDE_DEPLOIEMENT.md, étape 8, pour la mise en place (script Google Apps Script).</p>
+  `;
+
   el.innerHTML = html;
+}
+function saveEmailWebhook(){
+  state.settings.email_webhook_url = document.getElementById('emailWebhookUrl').value.trim();
+  persistAll();
+  toast('Adresse enregistrée');
+}
+function testEmailNow(){
+  if(!lastClosedRecap){ toast('Aucun récap disponible pour tester', true); return; }
+  saveEmailWebhook();
+  sendRecapByEmail(lastClosedRecap.session, lastClosedRecap.ventes, false);
 }
 function exportCurrentSession(){
   const sess = activeSession();
@@ -922,7 +1057,20 @@ function fmtPct(n){ return (n||0) + ' %'; }
 
 function writeCSV(sess, ventes, label){
   if(!ventes || ventes.length===0){ toast('Aucune vente à exporter', true); return; }
+  const csv = buildCSVString(sess, ventes);
+  downloadCSV(csv, label);
+  toast('CSV exporté');
+}
 
+function downloadCSV(csv, label){
+  const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ventes_${label}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+function buildCSVString(sess, ventes){
   const nbVentes = ventes.length;
   const totalArticles = ventes.reduce((sum, v) => {
     try{ return sum + JSON.parse(v.detail_articles).reduce((s,a)=>s+(a.quantite||0),0); }
@@ -992,13 +1140,7 @@ function writeCSV(sess, ventes, label){
   });
   lignes.push(['', '', fmtMoney(totalBrut), '', fmtMoney(totalNet), 'TOTAL']);
 
-  const csv = lignes.map(row => row.map(csvEscape).join(';')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `ventes_${label}.csv`;
-  document.body.appendChild(a); a.click(); a.remove();
-  toast('CSV exporté');
+  return lignes.map(row => row.map(csvEscape).join(';')).join('\n');
 }
 function modePaiementLabel(m){
   return m === 'Especes' ? 'Espèces' : m === 'CB' ? 'CB' : m === 'Cheque' ? 'Chèque' : (m||'');
@@ -1063,8 +1205,15 @@ function attachFirestoreListeners(){
     updateSessionInfo();
   }, (err) => { console.error('Erreur catalogue :', err); toast('Erreur catalogue (' + (err.code||'?') + ')', true); });
 
+  let marchesSeeded = false;
   db.collection('marches').orderBy('nom').onSnapshot(snap => {
     state.marches = snap.docs.map(d => d.data().nom).filter(Boolean);
+    if(state.marches.length === 0 && !marchesSeeded && SEED_MARCHES.length && !snap.metadata.fromCache){
+      marchesSeeded = true;
+      const batch = db.batch();
+      SEED_MARCHES.forEach(nom => batch.set(db.collection('marches').doc(), { nom }));
+      batch.commit().catch(()=>{});
+    }
     if(document.getElementById('sheetSession-bd').classList.contains('open')) renderSessionSheet();
   }, (err) => { console.error('Erreur marchés :', err); toast('Erreur marchés (' + (err.code||'?') + ')', true); });
 }
