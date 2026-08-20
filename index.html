@@ -483,8 +483,8 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
     <h2 id="confirmTitle">Confirmer</h2>
     <p class="sheet-sub" id="confirmMessage" style="white-space:pre-line;"></p>
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="resolveConfirm(false)">Annuler</button>
-      <button class="btn btn-danger" onclick="resolveConfirm(true)">Confirmer</button>
+      <button class="btn btn-secondary" id="confirmCancelBtn" onclick="resolveConfirm(false)">Annuler</button>
+      <button class="btn btn-danger" id="confirmOkBtn" onclick="resolveConfirm(true)">Confirmer</button>
     </div>
   </div>
 </div>
@@ -795,9 +795,11 @@ function toast(msg, danger){
    window.confirm() est bloqué dans certains contextes (aperçu intégré,
    webview embarquée) — cette version fonctionne partout. */
 let _confirmResolver = null;
-function askConfirm(message, title){
+function askConfirm(message, title, okLabel, cancelLabel){
   document.getElementById('confirmTitle').textContent = title || 'Confirmer';
   document.getElementById('confirmMessage').textContent = message;
+  document.getElementById('confirmOkBtn').textContent = okLabel || 'Confirmer';
+  document.getElementById('confirmCancelBtn').textContent = cancelLabel || 'Annuler';
   document.getElementById('confirmDialog-bd').classList.add('open');
   return new Promise(resolve => { _confirmResolver = resolve; });
 }
@@ -887,7 +889,9 @@ async function startSession(){
     if(!state.marches.includes(lieu)){
       const ajouter = await askConfirm(
         "Il sera proposé directement la prochaine fois, sur tous les appareils. Sinon, ce nom ne sert que pour cette session-ci.",
-        `Ajouter "${lieu}" à la liste des marchés ?`
+        `Ajouter "${lieu}" à la liste des marchés ?`,
+        'Confirmer',
+        'Non, juste cette fois'
       );
       if(ajouter) addMarche(lieu);
     }
