@@ -485,7 +485,7 @@ button{font-family:inherit; -webkit-tap-highlight-color:transparent;}
    Une session clôturée est immédiatement purgée après son récap/export.
    ============================================================ */
 
-const LS_KEYS = { sessions:'pos_sessions', ventes:'pos_ventes', settings:'pos_settings' };
+const LS_KEYS = { sessions:'pos_sessions', ventes:'pos_ventes' };
 
 const uid = (p) => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const eur = (n) => (Math.round((n+Number.EPSILON)*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
@@ -509,6 +509,12 @@ const firebaseConfig = {
   appId: "1:722689231248:web:f0e651f70f724707c4cb15"
 };
 const FIREBASE_CONFIGURED = !Object.values(firebaseConfig).some(v => String(v).includes('COLLEZ_ICI'));
+
+/* URL du script Google Apps Script qui envoie le récap par e-mail à la clôture
+   (voir GUIDE_DEPLOIEMENT.md, étape 8). Configurée une seule fois ici : tous les
+   téléphones qui ouvrent l'app l'ont automatiquement, sans rien à saisir. */
+const EMAIL_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxe68xrSbnUmifiUMiFzxRbogMMudU745dSBtVFWV3-hotK1UeJlly8QSvotseEjfDXRg/exec";
+const EMAIL_WEBHOOK_CONFIGURED = EMAIL_WEBHOOK_URL && !EMAIL_WEBHOOK_URL.includes('COLLEZ_ICI');
 
 /* ---------- persistence : ventes/sessions 100% locales à ce téléphone ---------- */
 function load(key, fallback){
@@ -540,7 +546,6 @@ let state = {
   marches: [],              // liste des marchés partagée (Firestore)
   sessions: load(LS_KEYS.sessions, []),   // ne contient jamais plus d'une session (l'active) — local
   ventes: load(LS_KEYS.ventes, []),       // uniquement les ventes de la session active — local
-  settings: load(LS_KEYS.settings, { email_webhook_url:'' }),  // réglages locaux à cet appareil
   remise: 0,
   netOverride: null,   // si non-null, montant net saisi manuellement (prioritaire sur la remise %)
   paiement: 'Especes',
@@ -549,7 +554,6 @@ let state = {
 function persistAll(){
   save(LS_KEYS.sessions, state.sessions);
   save(LS_KEYS.ventes, state.ventes);
-  save(LS_KEYS.settings, state.settings);
 }
 
 function activeSession(){ return state.sessions.find(s => s.statut === 'Active') || null; }
@@ -873,7 +877,7 @@ async function closeSession(){
   updateSessionInfo();
   closeSheet('sheetSession');
 
-  if(state.settings.email_webhook_url){
+  if(EMAIL_WEBHOOK_CONFIGURED){
     toast('Session clôturée — envoi du récap…');
     const res = await postRecapEmail(lastClosedRecap.session, lastClosedRecap.ventes);
     toast(
@@ -887,14 +891,13 @@ async function closeSession(){
   }
 }
 
-/* ---------- envoi du récap par e-mail (systématique à la clôture, si configuré) ---------- */
+/* ---------- envoi du récap par e-mail (systématique à la clôture) ---------- */
 async function postRecapEmail(sess, ventes){
-  const url = state.settings.email_webhook_url;
-  if(!url) return { ok:false, reason:'no-url' };
+  if(!EMAIL_WEBHOOK_CONFIGURED) return { ok:false, reason:'no-url' };
   const label = (sess.lieu_marche||'session').replace(/[^a-z0-9]+/gi,'_') + '_' + sess.date_session;
   const csv = buildCSVString(sess, ventes);
   try{
-    await fetch(url, {
+    await fetch(EMAIL_WEBHOOK_URL, {
       method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         csv,
@@ -910,7 +913,7 @@ async function postRecapEmail(sess, ventes){
 }
 /* Variante utilisée par le bouton "Tester maintenant" de l'écran Export (avec ses propres toasts) */
 async function sendRecapByEmail(sess, ventes, silencieux){
-  if(!state.settings.email_webhook_url){ if(!silencieux) toast('Aucune adresse d\'envoi configurée', true); return; }
+  if(!EMAIL_WEBHOOK_CONFIGURED){ if(!silencieux) toast('Envoi mail non configuré (voir index.html)', true); return; }
   if(!silencieux) toast('Envoi du récap par e-mail…');
   const res = await postRecapEmail(sess, ventes);
   if(!silencieux) toast(res.ok ? 'Récap envoyé par e-mail ✓' : 'Échec de l\'envoi mail', !res.ok);
@@ -1016,26 +1019,18 @@ function renderExportSheet(){
   html += `
     <div style="height:1px; background:var(--border-soft); margin:16px 0;"></div>
     <div class="field">
-      <label>Envoi automatique du récap à e.lejudec@gmail.com</label>
-      <input id="emailWebhookUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec" value="${escAttr(state.settings.email_webhook_url||'')}">
+      <label>Envoi automatique du récap</label>
     </div>
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="saveEmailWebhook()">Enregistrer</button>
       ${lastClosedRecap ? '<button class="btn btn-primary" onclick="testEmailNow()">Tester maintenant</button>' : ''}
     </div>
-    <p class="sheet-sub" style="margin-top:8px;">Une fois cette URL enregistrée, <strong>chaque clôture de session envoie automatiquement</strong> le récap CSV à e.lejudec@gmail.com — systématiquement, sans action supplémentaire. L'export manuel reste aussi disponible en plus. Voir GUIDE_DEPLOIEMENT.md, étape 8, pour la mise en place (script Google Apps Script).</p>
+    <p class="sheet-sub" style="margin-top:8px;">${EMAIL_WEBHOOK_CONFIGURED ? "Chaque clôture de session envoie automatiquement le récap CSV à e.lejudec@gmail.com — systématiquement, sans rien à faire. L'export manuel reste aussi disponible en plus." : "Envoi automatique non configuré — voir GUIDE_DEPLOIEMENT.md, étape 8."}</p>
   `;
 
   el.innerHTML = html;
 }
-function saveEmailWebhook(){
-  state.settings.email_webhook_url = document.getElementById('emailWebhookUrl').value.trim();
-  persistAll();
-  toast('Adresse enregistrée');
-}
 function testEmailNow(){
   if(!lastClosedRecap){ toast('Aucun récap disponible pour tester', true); return; }
-  saveEmailWebhook();
   sendRecapByEmail(lastClosedRecap.session, lastClosedRecap.ventes, false);
 }
 function exportCurrentSession(){
