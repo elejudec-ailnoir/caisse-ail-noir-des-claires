@@ -904,34 +904,48 @@ async function startSession(){
   renderSessionSheet();
   toast('Session démarrée : ' + lieu);
 }
+/* Empêche le rechargement auto (mise à jour de l'app) de couper une clôture
+   en plein milieu — voir le bloc serviceWorker en fin de fichier. */
+let closureInProgress = false;
+let pendingReload = false;
+
 async function closeSession(){
   const sess = activeSession(); if(!sess) return;
   if(!(await askConfirm(`CA total : ${eur(sess.total_ca)}`, `Clôturer la session "${sess.lieu_marche}" ?`))) return;
 
-  const ventesSession = state.ventes.filter(v => v.id_session === sess.id_session);
-  lastClosedRecap = { session: { ...sess, statut:'Clôturée' }, ventes: ventesSession.map(v => ({ ...v })) };
+  closureInProgress = true;
+  try{
+    const ventesSession = state.ventes.filter(v => v.id_session === sess.id_session);
+    lastClosedRecap = { session: { ...sess, statut:'Clôturée' }, ventes: ventesSession.map(v => ({ ...v })) };
 
-  // Rien n'est conservé durablement après clôture : purge immédiate de la session
-  // et de ses ventes. lastClosedRecap ne vit qu'en mémoire vive (filet de sécurité
-  // pour un renvoi manuel depuis Menu → Export en cas d'échec de l'envoi mail).
-  state.sessions = state.sessions.filter(s => s.id_session !== sess.id_session);
-  state.ventes = state.ventes.filter(v => v.id_session !== sess.id_session);
-  persistAll();
+    // Rien n'est conservé durablement après clôture : purge immédiate de la session
+    // et de ses ventes. lastClosedRecap ne vit qu'en mémoire vive (filet de sécurité
+    // pour un renvoi manuel depuis Menu → Export en cas d'échec de l'envoi mail).
+    state.sessions = state.sessions.filter(s => s.id_session !== sess.id_session);
+    state.ventes = state.ventes.filter(v => v.id_session !== sess.id_session);
+    persistAll();
 
-  updateSessionInfo();
-  closeSheet('sheetSession');
+    updateSessionInfo();
+    closeSheet('sheetSession');
 
-  if(EMAIL_WEBHOOK_CONFIGURED){
-    toast('Session clôturée — envoi du récap…');
-    const res = await postRecapEmail(lastClosedRecap.session, lastClosedRecap.ventes);
-    toast(
-      res.ok
-        ? `Récap envoyé par e-mail ✓ (CA : ${eur(lastClosedRecap.session.total_ca)})`
-        : `Session clôturée · échec de l'envoi mail (CA : ${eur(lastClosedRecap.session.total_ca)}) — réessayez depuis Menu → Export`,
-      !res.ok
-    );
-  } else {
-    toast(`Session clôturée — CA : ${eur(lastClosedRecap.session.total_ca)} (aucun envoi mail configuré)`, true);
+    if(EMAIL_WEBHOOK_CONFIGURED){
+      toast('Session clôturée — envoi du récap…');
+      const res = await postRecapEmail(lastClosedRecap.session, lastClosedRecap.ventes);
+      toast(
+        res.ok
+          ? `Récap envoyé par e-mail ✓ (CA : ${eur(lastClosedRecap.session.total_ca)})`
+          : `Session clôturée · échec de l'envoi mail (CA : ${eur(lastClosedRecap.session.total_ca)}) — réessayez depuis Menu → Export`,
+        !res.ok
+      );
+    } else {
+      toast(`Session clôturée — CA : ${eur(lastClosedRecap.session.total_ca)} (aucun envoi mail configuré)`, true);
+    }
+  } finally {
+    closureInProgress = false;
+    if(pendingReload){
+      pendingReload = false;
+      setTimeout(() => window.location.reload(), 2500); // laisse le temps de lire le dernier toast
+    }
   }
 }
 
@@ -1287,11 +1301,17 @@ initApp();
 
 if('serviceWorker' in navigator){
   // Dès qu'une nouvelle version du service worker prend le relais, on recharge
-  // la page une seule fois pour afficher automatiquement la dernière version —
-  // plus besoin de vider le cache ou l'historique manuellement.
+  // la page pour afficher automatiquement la dernière version — sauf si une
+  // clôture de session est en train de se terminer (envoi mail en cours) :
+  // dans ce cas, on attend la fin de l'opération avant de recharger, pour ne
+  // jamais couper une clôture en plein milieu.
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if(refreshing) return;
+    if(closureInProgress){
+      pendingReload = true;
+      return;
+    }
     refreshing = true;
     window.location.reload();
   });
